@@ -1,6 +1,7 @@
 import os
 import pickle
 import argparse
+import unicodedata
 
 import pandas as pd
 
@@ -37,8 +38,12 @@ def define_argparser():
     return config
 
 
-def get_char_labels(length, ne, label_to_index):
-    char_labels = [0] * length
+def get_char_labels(sentence, ne, label_to_index, normalize=False):
+    """
+    Labeling tags by character-level.
+    Parameter "normalize" for KoBERTTokenizer, which used to normalize unicode text before tokenizing.
+    """
+    char_labels = [0] * len(sentence)
     for i in range(1, len(ne)+1):
         begin = ne[i]['begin']
         end = ne[i]['end']
@@ -48,24 +53,42 @@ def get_char_labels(length, ne, label_to_index):
             char_labels[j] = label_to_index[I_label]
         char_labels[begin] = label_to_index[B_label]
 
+    if normalize:
+        normalized_sentence = unicodedata.normalize("NFKC", sentence)
+        for i, char in enumerate(sentence):
+            normalized_char = unicodedata.normalize("NFKC", char)
+            if len(normalized_char) > 1:
+                char_labels[i:i] = [char_labels[i]] * (len(normalized_char)-1)
+                if len(char_labels) == len(normalized_sentence):
+                    break        
+
     return char_labels
 
 
 def get_kobert_offset_mappings(kobert_tokens):
+    """
+    This function is for KoBERTTokenizer, which cannot return offset_mappings.
+    """
     kobert_offset_mappings = []
     offset_begin = -1
     for i in kobert_tokens:
+        if i in ["[CLS]", "[SEP]"]:
+            kobert_offset_mappings.append((0, 0))
+            continue
         if i.startswith('▁'):
             offset_begin += 1
             i = i[1:]
-    offset_end = offset_begin+len(i)
-    kobert_offset_mappings.append((offset_begin, offset_end))
-    offset_begin = offset_end
+        offset_end = offset_begin+len(i)
+        kobert_offset_mappings.append((offset_begin, offset_end))
+        offset_begin = offset_end
 
     return kobert_offset_mappings
 
 
-def get_token_labels(char_labels, offset_mappings=None):
+def get_token_labels(char_labels, offset_mappings):
+    """
+    Labeling tags by token-level.
+    """
     token_labels = []
 
     for offset_mapping in offset_mappings:
@@ -76,45 +99,6 @@ def get_token_labels(char_labels, offset_mappings=None):
         token_labels.append(char_labels[start_offset])
 
     return token_labels
-
-
-def BIO_tagging(text_tokens, ne, offset_map=None):
-    labeled_sequence = [token if token in [
-        '[CLS]', '[SEP]', '[PAD]'] else 'O' for token in text_tokens]
-    ne_no = len(ne.keys())
-    if ne_no > 0:
-        for idx in range(1, ne_no+1):
-            ne_dict = ne[idx]
-            ne_dict_offset = ne_dict['begin']
-            label_length = len(ne_dict['form'].replace(' ', ''))
-            isbegin = True
-            for word_idx, word in enumerate(text_tokens):
-                if word == '[UNK]':
-                    if offset_map[word_idx][0] == ne_dict_offset:
-                        labeled_sequence[word_idx] = str(
-                            'B-'+ne_dict['label'][:2])
-                        break
-                if label_length == 0:
-                    break
-                if ('##' in word) or ('▁' in word):
-                    if word == '▁':
-                        continue
-                    word = word.replace('##', '')
-                    word = word.replace('▁', '')
-                if word in ne_dict['form']:
-                    if isbegin:
-                        labeled_sequence[word_idx] = str(
-                            'B-'+ne_dict['label'][:2])
-                        isbegin = False
-                        label_length = label_length - len(word)
-                        continue
-                    elif (label_length > 0) & (isbegin == False) & (('B-' in labeled_sequence[word_idx-1]) or ('I-' in labeled_sequence[word_idx-1])):
-                        labeled_sequence[word_idx] = str(
-                            'I-'+ne_dict['label'][:2])
-                        label_length = label_length - len(word)
-                        continue
-
-    return labeled_sequence
 
 
 def get_label_dict(labels):
@@ -178,30 +162,15 @@ def main(config):
     if USE_KOBERT:
         text_tokens = [[cls_token] + tokenizer.tokenize(text)[:max_length-2] + [sep_token] for text in texts]
         offset_mappings = [get_kobert_offset_mappings(text_token) for text_token in text_tokens]
+        text_normalize=True
     else: 
         offset_mappings = encoded['offset_mapping']
+        text_normalize=False
 
     for text, ne, offset_mapping in zip(texts, nes, offset_mappings):
-        char_labels = get_char_labels(len(text), ne, label_to_index)
+        char_labels = get_char_labels(text, ne, label_to_index, normalize=text_normalize)
         token_labels = get_token_labels(char_labels, offset_mapping)
         ne_ids.append(token_labels)
-
-    # if tokenizer.name_or_path == 'skt/kobert-base-v1':
-    #     for text, ne in zip(texts, nes):
-    #         text_tokens = [cls_token] + \
-    #             tokenizer.tokenize(text)[:max_length-2] + [sep_token]
-    #         ne_sequence = BIO_tagging(text_tokens=text_tokens, ne=ne)
-    #         ne_id = [label_to_index[key] if key in label_to_index.keys()
-    #                  else -100 for key in ne_sequence]
-    #         ne_ids.append(ne_id)
-    # else:
-    #     for text, ne, offset_mapping in zip(texts, nes, encoded['offset_mapping']):
-    #         text_tokens = [cls_token] + \
-    #             tokenizer.tokenize(text)[:max_length-2] + [sep_token]
-    #         ne_sequence = BIO_tagging(text_tokens, ne, offset_mapping)
-    #         ne_id = [label_to_index[key] if key in label_to_index.keys()
-    #                  else -100 for key in ne_sequence]
-    #         ne_ids.append(ne_id)
 
     print("Sequence labeling completed : |labels| %d" % (len(ne_ids)))
 
