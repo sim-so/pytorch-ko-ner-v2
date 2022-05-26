@@ -210,7 +210,7 @@ def main(config):
                      n_splits=config.n_splits, shuffle=True)
 
     if config.set_nth != None:
-        print(f'=== fold {i} of {config.n_splits} training ===')
+        print(f'=== fold {config.set_nth} of {config.n_splits} training ===')
         train_one_fold(data, config.set_nth, data_args, config)
     else:
         for i in range(config.n_splits):
