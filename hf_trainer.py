@@ -201,6 +201,7 @@ def train_one_fold(data, n_fold, data_args, config):
         'config': config,
         'vocab': None,
         'classes': index_to_label,
+        'pretrained_model_name': data_args['pretrained_model_name']
     }, model_fn)
 
 
@@ -209,6 +210,7 @@ def main(config):
                      n_splits=config.n_splits, shuffle=True)
 
     if config.set_nth != None:
+        print(f'=== fold {i} of {config.n_splits} training ===')
         train_one_fold(data, config.set_nth, data_args, config)
     else:
         for i in range(config.n_splits):

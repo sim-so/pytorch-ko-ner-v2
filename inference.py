@@ -68,12 +68,13 @@ def main(config):
     train_config = saved_data['config']
     bert_best = saved_data['bert']
     index_to_label = saved_data['classes']
+    pretrained_model_name = saved_data['pretrained_model_name']
 
     with torch.no_grad():
         # Declare model and load pre-trained weights.
         tokenizer_loader = KoBERTTokenizer if config.use_KoBERTTokenizer else AutoTokenizer
-        tokenizer = tokenizer_loader.from_pretrained(train_config.pretrained_model_name)
-        model = AutoModelForTokenClassification.from_pretrained(train_config.pretrained_model_name,
+        tokenizer = tokenizer_loader.from_pretrained(pretrained_model_name)
+        model = AutoModelForTokenClassification.from_pretrained(pretrained_model_name,
                                                                 num_labels=len(index_to_label)
                                                                )
         model.load_state_dict(bert_best)

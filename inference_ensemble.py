@@ -109,11 +109,12 @@ def main(config):
     train_config = saved_data_list[0]['config']
     index_to_label = saved_data_list[0]['classes']
     bert_best_list = [saved_data['bert'] for saved_data in saved_data_list]
+    pretrained_model_name = saved_data_list[0]['pretrained_model_name']
 
     tokenizer_loader = KoBERTTokenizer if config.use_KoBERTTokenizer else AutoTokenizer 
-    tokenizer = tokenizer_loader.from_pretrained(train_config.pretrained_model_name)
+    tokenizer = tokenizer_loader.from_pretrained(pretrained_model_name)
     model = AutoModelForTokenClassification.from_pretrained(
-                                                                train_config.pretrained_model_name,
+                                                                pretrained_model_name,
                                                                 num_labels=len(index_to_label))
     test_data = read_pickle(config.test_file)
 
