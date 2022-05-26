@@ -10,7 +10,6 @@ from torch.utils.data import DataLoader
 
 # kobert tokenizer/ model
 from kobert_tokenizer import KoBERTTokenizer
-from transformers import BertModel
 
 # Huggingface AutomModel/Tokenizer
 from transformers import AutoModelForTokenClassification

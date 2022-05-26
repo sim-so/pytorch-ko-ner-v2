@@ -26,11 +26,13 @@ from tqdm import tqdm
 from datasets import load_metric
 from seqeval.metrics import classification_report
 
+
 def define_argparser():
     """
     Define argument parser to take inference using pre-trained model.
     """
     p = argparse.ArgumentParser()
+    
     p.add_argument('--model_folder', required=True)
     p.add_argument('--test_file', required=True)
     p.add_argument('--use_KoBERTTokenizer', action='store_true') # default는 AutoTokenizer
@@ -38,14 +40,18 @@ def define_argparser():
     p.add_argument('--batch_size', type=int, default=16)
 
     config = p.parse_args()
+
     return config
+
 
 def read_pickle(fn):
     with open(fn, 'rb') as f:
         dataset = pickle.load(f)
     data = pd.DataFrame(dataset.pop('data'))
     test_data = NERDatasetPreEncoded(data['input_ids'].tolist(), data['attention_mask'].tolist(), data['labels'].tolist())
+
     return test_data
+
 
 # inference function
 def do_inference(tokenizer, model, bert_best, test_data):
@@ -75,7 +81,9 @@ def do_inference(tokenizer, model, bert_best, test_data):
             logit = model(x, attention_mask=mask).logits
             logits.extend(logit.cpu().numpy())  # |len(test_data), length, classes|
             labels.extend(batch["labels"].cpu().numpy())  # |len(test_data), length|
+
     return logits, labels
+
 
 # evaluation fuction
 def compute_metrics(predictions, labels):
@@ -89,7 +97,7 @@ def compute_metrics(predictions, labels):
 
 
 def main(config):
-    model_files = os.listdir(config.model_folder)
+    model_files = [x for x in os.listdir(config.model_folder) if x.endswith("pth")]
     saved_data_list = []
     for model_file in model_files:
         saved_data = torch.load(
