@@ -1,10 +1,13 @@
 # PLM 기반 한국어 개체명 인식 (NER)
 주요 한국어 PLM의 fine-tuning을 통해 한국어 개체명 인식 다운스트림 태스크를 진행했습니다. HuggingFace 라이브러리를 활용해 국립국어원 개체명 분석 말뭉치 데이터셋에서 개체명으로 정의된 15개 개체명 유형 (인명, 지명, 문명, 인공물 등)에 대해 개체명 인식기를 구현했습니다. 
+이 repository에서는 BIO tagging 방식과 일부 코드의 편의성을 수정했습니다. 기존 코드와 비교하면 코드 사용 방식과 결과 점수에 차이가 있으며, 변경점은 문서 아래에 기재하였습니다.
+
 
 ## Data
 - 국립국어원  개체명  분석  말뭉치 2021 (https://corpus.korean.go.kr/main.do)
 - 문어체 300만 + 문어체 300만 단어로 총 600만 단어, 약 80만 문장으로 구성
 - 80만 문장 가운데 개체명 태깅 정보가 없는 경우를 제외하고 약 35만 문장으로 태스크 진행
+
 
 ## Pre-Requisite
 - python 3.8 기준으로 테스트
@@ -23,7 +26,7 @@ pip install 'git+https://github.com/SKTBrain/KoBERT.git#egg=kobert_tokenizer&sub
 |klue/roberta-base|6.5B words incl. Modu, Namuwiki|Mecab +BPE|32,000|768|12|12|2048|
 |skt/kobert-base-v1|Korean Wiki 54M words  |SentencePiece|8,002|3072|12|12|-|
 |monologg/koelectra-base-v3-discriminator|crawled news data and Modu  |Wordpiece|35,000|768|12|12|256|
-|monologg/kobigbird-bert-base|crawled news data and Modu  |Sentencepiece|32,500|768|12|12|32|
+
 
 ## How to Use
 
@@ -39,7 +42,7 @@ python ./preprocess/json_to_tsv.py --load_path data/json/21_150tags_NamedEntity 
 2. 학습과 평가 데이터셋을 만들어 train.pickle, test.pickle로 저장합니다.
 데이터를 합치고 필요 없는 열, 문장이 누락된 행을 제거하는 과정이 포함됩니다.
 ```bash
-python ./preprocess/preprocess.py --load_path data/raw --load_path data/dataset --test_size 0.15 --test_o_size 0.2 --save_all --return_tsv
+python ./preprocess/preprocess.py --load_path data/raw --save_path data/dataset --test_size 0.15 --test_o_size 0.2 --save_all --return_tsv
 ```
 ```
 4 files found :  ['SXNE21.pickle', 'SXNE2102007240.pickle', 'NXNE2102008030.pickle', 'NXNE2102203310.pickle']
@@ -76,15 +79,16 @@ Encoded data saved as data/encoded/test.klue_roberta-base.encoded.pickle
 ### Train (Fine-Tuning)
 인코딩이 완료된 데이터셋을 사용하여 학습을 진행합니다.
 ``` bash
-python hf_trainer.py --model_fn models --data_fn data/encoded/train.klue_roberta-base.encoded.pickle --pretrained_model_name klue/roberta-base --use_kfold --n_splits 5
+python hf_trainer.py --model_folder models --data_fn data/encoded/train.klue_roberta-base.encoded.pickle --use_kfold --n_splits 5
 ```
 
 - "--use_kfold"를 사용하는 경우 "--n_splits"와 사용할 폴드 수를 추가합니다.
+- "--use_kfold", "--n_splits"를 사용하는 경우, "--fold_i"와 fold 번호를 추가하여 특정 fold에 대해서만 학습을 진행할 수 있습니다.
 
 ### Fine-Tuning Details
 - Total train data : 303028
 - Train : validation = 8 : 2 (242422 : 60606)
-- Batch size, epochs : 32, 2 (BigBird의 경우 16, 1)
+- Batch size, epochs : 16, 1
 - n-Fold : 5
 - total iterations : 폴드별 15152번으로 동일하게 설정
 
@@ -93,23 +97,31 @@ python hf_trainer.py --model_fn models --data_fn data/encoded/train.klue_roberta
 트레이닝과 동일하게 전처리한 테스트 데이터셋(66845개)에 대해 모델별, 폴더별 5개 체크포인트 결과의 평균을 최종값으로 하는 앙상블 기법을 적용합니다. --model_folder는 각 모델의 5개 체크포인트 결과가 들어있는 폴더이고, --test_file은 테스트 파일 이름입니다. 
 
 ```bash
-python inference_ensemble.py --model_folder ./model -- test_file ./test_klue_roberta-base.encoded.pickle
+python inference_ensemble.py --model_folder ./model -- test_file ./test_klue_roberta-base.encoded.pickle > ./results/roberta_output.tsv
 ```
 
 ## Evaluation
 - Entity-level micro F1 (Entity F1) 
-- 테스트 데이터의 인퍼런스 결과 klue/roberta-base가 근소한 성능으로 우수
+- 테스트 데이터의 인퍼런스 결과 klue/bert-base가 근소한 성능으로 우수
 
 |PLMs|F1 Score|Accuracy|
 |-|-|-|
-|klue/bert-base|0.865|0.974|
-|klue/roberta-base|0.866|0.974|
-|skt/kobert-base-v1|0.846|0.965|
-|monologg/koelectra-base-v3-discriminator|0.858|0.972|
-|monologg/kobigbird-bert-base|0.827|0.965|
+|klue/bert-base|0.895|0.975|
+|klue/roberta-base|0.894|0.974|
+|skt/kobert-base-v1|0.861|0.960|
+|monologg/koelectra-base-v3-discriminator|0.888|0.972|
+
+
+## Changes
+- encoding.py에서 sequence labeling을 offset_mappings에 따라 수행하도록 수정했습니다.
+- encoding.py 실행 결과물에 모델 정보를 포함하고, hf_trainer.py에서 --pretrained_model_name을 입력하지 않아도 되도록 수정했습니다.
+- hf_trainer.py에서 k-fold cross validation을 사용하는 경우 하나의 fold를 지정하여 학습할 수 있도록 수정했습니다.
+- 수정된 코드를 활용한 실험의 경우, batch size와 epoch 수를 낮추어 진행하였고, KoBigBird가 실험 대상에서 제외되었습니다.
 
 
 ## Reference
 - Devlin et al., BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding, ACL, 2019
-- Kihyun Kim, Simple Neural Text Classification (NTC), GitHub
 - 황석현 외, BERT를 활용한 한국어 개체명 인식기, 한국정보처리학회, 2019
+- 유현조 외, 딥러닝 기반 한국어 개체명 인식의 평가와 오류 분석 연구, 한국언어학회, 2021
+- Kihyun Kim, Simple Neural Text Classification (NTC), [GitHub](https://github.com/kh-kim/simple-ntc)
+- Boseop Kim, NLP Tutorials: Token Classification - BERT, [GitHub](https://github.com/seopbo/nlp_tutorials/blob/main/token_classification_(klue_ner)_BERT.ipynb)
