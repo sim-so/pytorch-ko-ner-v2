@@ -39,7 +39,7 @@ def define_argparser():
 
     p.add_argument('--use_kfold', action='store_true')
     p.add_argument('--n_splits', type=int, default=1)
-    p.add_argument('--set_nth', 
+    p.add_argument('--fold_i', 
                 type=int, 
                 default=None,
                 help="It would be used to train with a certain fold of data due to resource limitation.")
@@ -209,9 +209,9 @@ def main(config):
     data, data_args = load_data(config.data_fn, use_kfold=config.use_kfold,
                      n_splits=config.n_splits, shuffle=True)
 
-    if config.set_nth != None:
-        print(f'=== fold {config.set_nth} of {config.n_splits} training ===')
-        train_one_fold(data, config.set_nth, data_args, config)
+    if config.fold_i != None:
+        print(f'=== fold {config.fold_i} of {config.n_splits} training ===')
+        train_one_fold(data, config.fold_i, data_args, config)
     else:
         for i in range(config.n_splits):
             print(f'=== fold {i} of {config.n_splits} training ===')
