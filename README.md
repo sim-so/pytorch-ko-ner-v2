@@ -27,7 +27,7 @@ pip install 'git+https://github.com/SKTBrain/KoBERT.git#egg=kobert_tokenizer&sub
 |klue/roberta-base|6.5B words incl. Modu, Namuwiki|Mecab +BPE|32,000|768|12|12|2048|
 |skt/kobert-base-v1|Korean Wiki 54M words  |SentencePiece|8,002|3072|12|12|-|
 |monologg/koelectra-base-v3-discriminator|crawled news data and Modu  |Wordpiece|35,000|768|12|12|256|
-
+|monologg/kobigbird-bert-base|crawled news data and Modu  |Sentencepiece|32,500|768|12|12|32|
 
 ## How to Use
 
@@ -111,13 +111,14 @@ python inference_ensemble.py --model_folder ./model -- test_file ./test_klue_rob
 |klue/roberta-base|0.894|0.974|
 |skt/kobert-base-v1|0.861|0.960|
 |monologg/koelectra-base-v3-discriminator|0.888|0.972|
+|monologg/kobigbird-bert-base|0.889|0.972|
 
 
 ## Changes
 - encoding.py에서 sequence labeling을 offset_mappings에 따라 수행하도록 수정했습니다.
 - encoding.py 실행 결과물에 모델 정보를 포함하고, hf_trainer.py에서 --pretrained_model_name을 입력하지 않아도 되도록 수정했습니다.
 - hf_trainer.py에서 k-fold cross validation을 사용하는 경우 하나의 fold를 지정하여 학습할 수 있도록 수정했습니다.
-- 수정된 코드를 활용한 실험의 경우, batch size와 epoch 수를 낮추어 진행하였고, KoBigBird가 실험 대상에서 제외되었습니다.
+- 수정된 코드를 활용한 실험의 경우, batch size와 epoch 수를 낮추고 iteration은 동일하도록 맞추었습니다.
 
 
 ## Reference
